@@ -95,6 +95,7 @@ static const struct kfd_device_info raven_device_info = {
 	.num_xgmi_sdma_engines = 0,
 	.num_sdma_queues_per_engine = 2,
 };
+
 #endif
 
 static const struct kfd_device_info hawaii_device_info = {
@@ -406,6 +407,10 @@ static const struct kfd_deviceid supported_devices[] = {
 	{ 0x15DD, &raven_device_info },		/* Raven */
 	{ 0x15D8, &raven_device_info },		/* Raven */
 #endif
+        { 0x9920, &polaris10_device_info },             /* Liverpool */
+        { 0x9922, &polaris10_device_info },             /* Liverpool */
+        { 0x9923, &polaris10_device_info },             /* Liverpool */
+        { 0x9924, &polaris10_device_info },               /* Gladius */
 	{ 0x67A0, &hawaii_device_info },	/* Hawaii */
 	{ 0x67A1, &hawaii_device_info },	/* Hawaii */
 	{ 0x67A2, &hawaii_device_info },	/* Hawaii */

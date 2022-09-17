@@ -396,8 +396,10 @@ static int dce_v8_0_get_num_crtc(struct amdgpu_device *adev)
 	switch (adev->asic_type) {
 	case CHIP_BONAIRE:
 	case CHIP_HAWAII:
+	case CHIP_GLADIUS:
 		num_crtc = 6;
 		break;
+	case CHIP_LIVERPOOL:
 	case CHIP_KAVERI:
 		num_crtc = 4;
 		break;
@@ -1091,8 +1093,9 @@ static void dce_v8_0_bandwidth_update(struct amdgpu_device *adev)
 	struct drm_display_mode *mode = NULL;
 	u32 num_heads = 0, lb_size;
 	int i;
-
-	amdgpu_display_update_priority(adev);
+	// FIXME PS4: this stuff is broken
+	return;
+	//amdgpu_display_update_priority(adev);
 
 	for (i = 0; i < adev->mode_info.num_crtc; i++) {
 		if (adev->mode_info.crtcs[i]->base.enabled)
@@ -1386,6 +1389,8 @@ static int dce_v8_0_audio_init(struct amdgpu_device *adev)
 	else if ((adev->asic_type == CHIP_BONAIRE) ||
 		 (adev->asic_type == CHIP_HAWAII))/* BN/HW: 6 streams, 7 endpoints */
 		adev->mode_info.audio.num_pins = 7;
+		else if (adev->asic_type == CHIP_LIVERPOOL || adev->asic_type == CHIP_GLADIUS) /* LVP: 3 streams, 3 endpoints (?) */
+			adev->mode_info.audio.num_pins = 3;
 	else
 		adev->mode_info.audio.num_pins = 3;
 
@@ -1400,7 +1405,13 @@ static int dce_v8_0_audio_init(struct amdgpu_device *adev)
 		adev->mode_info.audio.pin[i].id = i;
 		/* disable audio.  it will be set up later */
 		/* XXX remove once we switch to ip funcs */
-		dce_v8_0_audio_enable(adev, &adev->mode_info.audio.pin[i], false);
+		//dce_v8_0_audio_enable(adev, &adev->mode_info.audio.pin[i], false);
+		/* Liverpool pin 2 is S/PDIF and should always be available */
+		if (adev->asic_type == CHIP_LIVERPOOL || adev->asic_type == CHIP_GLADIUS)
+			dce_v8_0_audio_enable(adev, &adev->mode_info.audio.pin[i], true);
+		else
+			dce_v8_0_audio_enable(adev, &adev->mode_info.audio.pin[i], false);
+
 	}
 
 	return 0;
@@ -1977,7 +1988,8 @@ static int dce_v8_0_crtc_do_set_base(struct drm_crtc *crtc,
 	}
 
 	/* Bytes per pixel may have changed */
-	dce_v8_0_bandwidth_update(adev);
+	if (adev->asic_type != CHIP_LIVERPOOL && adev->asic_type != CHIP_GLADIUS)
+		dce_v8_0_bandwidth_update(adev);
 
 	return 0;
 }
@@ -2591,12 +2603,17 @@ static int dce_v8_0_crtc_init(struct amdgpu_device *adev, int index)
 	drm_mode_crtc_set_gamma_size(&amdgpu_crtc->base, 256);
 	amdgpu_crtc->crtc_id = index;
 	adev->mode_info.crtcs[index] = amdgpu_crtc;
-
-	amdgpu_crtc->max_cursor_width = CIK_CURSOR_WIDTH;
-	amdgpu_crtc->max_cursor_height = CIK_CURSOR_HEIGHT;
-	adev->ddev->mode_config.cursor_width = amdgpu_crtc->max_cursor_width;
-	adev->ddev->mode_config.cursor_height = amdgpu_crtc->max_cursor_height;
-
+	if (adev->asic_type == CHIP_LIVERPOOL || adev->asic_type == CHIP_GLADIUS) {
+		amdgpu_crtc->max_cursor_width = 64;
+		amdgpu_crtc->max_cursor_height = 64;
+		adev->ddev->mode_config.cursor_width = amdgpu_crtc->max_cursor_width;
+		adev->ddev->mode_config.cursor_height = amdgpu_crtc->max_cursor_height;
+	}
+	else
+	{
+		adev->ddev->mode_config.cursor_width = amdgpu_crtc->max_cursor_width;
+		adev->ddev->mode_config.cursor_height = amdgpu_crtc->max_cursor_height;
+	}
 	amdgpu_crtc->crtc_offset = crtc_offsets[amdgpu_crtc->crtc_id];
 
 	amdgpu_crtc->pll_id = ATOM_PPLL_INVALID;
@@ -2622,10 +2639,12 @@ static int dce_v8_0_early_init(void *handle)
 	switch (adev->asic_type) {
 	case CHIP_BONAIRE:
 	case CHIP_HAWAII:
+	case CHIP_GLADIUS:
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 6;
 		break;
 	case CHIP_KAVERI:
+	case CHIP_LIVERPOOL:
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 7;
 		break;
@@ -2634,6 +2653,7 @@ static int dce_v8_0_early_init(void *handle)
 		adev->mode_info.num_hpd = 6;
 		adev->mode_info.num_dig = 6; /* ? */
 		break;
+
 	default:
 		/* FIXME: not supported yet */
 		return -EINVAL;
@@ -2746,6 +2766,10 @@ static int dce_v8_0_hw_init(void *handle)
 
 	for (i = 0; i < adev->mode_info.audio.num_pins; i++) {
 		dce_v8_0_audio_enable(adev, &adev->mode_info.audio.pin[i], false);
+		if (adev->asic_type == CHIP_LIVERPOOL || adev->asic_type == CHIP_GLADIUS)
+			dce_v8_0_audio_enable(adev, &adev->mode_info.audio.pin[i], true);
+		else
+			dce_v8_0_audio_enable(adev, &adev->mode_info.audio.pin[i], false);
 	}
 
 	dce_v8_0_pageflip_interrupt_init(adev);

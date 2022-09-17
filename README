@@ -1,3 +1,12 @@
+
+
+How to compile this kernel?
+
+git clone https://github.com/whitehax0r/ps4-linux-baikal.git
+cd ps4-linux-baikal
+mv config .config
+make -j7 bzImage
+
 Linux kernel
 ============
 
